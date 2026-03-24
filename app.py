@@ -5,13 +5,22 @@ import os
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
 
 
 load_dotenv()
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+def get_embedding_model() -> HuggingFaceEmbeddings:
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL_NAME,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True},
+    )
 
 st.set_page_config(page_title="RAG Book Assistant")
 
@@ -43,7 +52,7 @@ if uploaded_file:
 
             chunks = splitter.split_documents(docs)
 
-            embeddings = OpenAIEmbeddings()
+            embeddings = get_embedding_model()
 
             vectorstore = Chroma.from_documents(
                 documents=chunks,
@@ -59,7 +68,7 @@ if uploaded_file:
 
 if os.path.exists("chroma_db"):
 
-    embeddings = OpenAIEmbeddings()
+    embeddings = get_embedding_model()
 
     vectorstore = Chroma(
         persist_directory="chroma_db",
@@ -67,12 +76,8 @@ if os.path.exists("chroma_db"):
     )
 
     retriever = vectorstore.as_retriever(
-        search_type="mmr",
-        search_kwargs={
-            "k":4,
-            "fetch_k":10,
-            "lambda_mult":0.5
-        }
+        search_type="similarity",
+        search_kwargs={"k": 6},
     )
 
     llm = ChatMistralAI(model="mistral-small-2506")
@@ -83,10 +88,10 @@ if os.path.exists("chroma_db"):
                 "system",
                 """You are a helpful AI assistant.
 
-Use ONLY the provided context to answer the question.
+Use the provided context as the primary source to answer the question.
 
-If the answer is not present in the context,
-say: "I could not find the answer in the document."
+If the context does not contain enough information, say:
+"I could not find the answer in the document."
 """
             ),
             (
@@ -109,6 +114,10 @@ Question:
     if query:
 
         docs = retriever.invoke(query)
+        if not docs:
+            st.write("### AI Answer")
+            st.write("I could not find the answer in the document.")
+            st.stop()
 
         context = "\n\n".join(
             [doc.page_content for doc in docs]
