@@ -84,6 +84,10 @@ streamlit app.py
 ## Troubleshooting
 
 
+## Pipeline Guide & Interview Q&A
+
+For a detailed walkthrough of every stage of the RAG pipeline, the exact functions and classes used at each stage, and a comprehensive set of interview questions and answers, see **[PIPELINE_GUIDE.md](PIPELINE_GUIDE.md)**.
+
 ## Acknowledgments
 
 - Hugging Face for transformer models
